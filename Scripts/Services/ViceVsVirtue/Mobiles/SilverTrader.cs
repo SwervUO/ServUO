@@ -52,9 +52,22 @@ namespace Server.Engines.VvV
             list.Add(1155513); // Vice vs Virtue Reward Vendor
         }
 
+        private DateTime _NextSpeak;
+
+        public override void OnMovement(Mobile m, Point3D oldLocation)
+        {
+            base.OnMovement(m, oldLocation);
+
+            if (_NextSpeak < DateTime.UtcNow && ViceVsVirtueSystem.IsVvV(m) && InRange(m.Location, 6) && m.Race == Race.Gargoyle)
+            {
+                SayTo(m, 1155534); // I will convert your human artifacts to gargoyle versions if you hand them to me.
+                _NextSpeak = DateTime.UtcNow + TimeSpan.FromSeconds(25);
+            }
+        }
+
         public override void OnDoubleClick(Mobile m)
         {
-            if (m is PlayerMobile && InRange(m.Location, 3))
+            if (ViceVsVirtueSystem.Enabled && m is PlayerMobile && InRange(m.Location, 3))
             {
                 if (ViceVsVirtueSystem.IsVvV(m))
                 {
@@ -96,12 +109,6 @@ namespace Server.Engines.VvV
                         if (i is IVvVItem)
                             ((IVvVItem)i).IsVvVItem = true;
 
-                        if (i is VesperOrderShield)
-                        {
-                            i.Name = "Order Shield";
-                            ((VesperOrderShield)i).Attributes.CastSpeed = 0;
-                        }
-
                         NegativeAttributes neg = RunicReforging.GetNegativeAttributes(i);
 
                         if (neg != null)
@@ -115,10 +122,86 @@ namespace Server.Engines.VvV
                             }
                         }
 
+                        ViceVsVirtueSystem.Instance.AddVvVItem(i, true);
+
                         Backpack.DropItem(i);
                     }
                 }
             }
+        }
+
+        private Type[][] _Table =
+        {
+            new Type[] { typeof(CrimsonCincture), typeof(GargishCrimsonCincture) },
+            new Type[] { typeof(MaceAndShieldGlasses), typeof(GargishMaceAndShieldGlasses) },
+            new Type[] { typeof(WizardsCrystalGlasses), typeof(GargishWizardsCrystalGlasses) },
+            new Type[] { typeof(FoldedSteelGlasses), typeof(GargishFoldedSteelGlasses) },
+        };
+
+        public override bool OnDragDrop(Mobile from, Item dropped)
+        {
+            if (ViceVsVirtueSystem.IsVvV(from))
+            {
+                if (!(dropped is IOwnerRestricted) || ((IOwnerRestricted)dropped).Owner == from)
+                {
+                    if (dropped is IVvVItem && from.Race == Race.Gargoyle)
+                    {
+                        foreach (var t in _Table)
+                        {
+                            if (dropped.GetType() == t[0])
+                            {
+                                IDurability dur = dropped as IDurability;
+
+                                if (dur != null && dur.MaxHitPoints == 255 && dur.HitPoints == 255)
+                                {
+                                    var item = Loot.Construct(t[1]);
+
+                                    if (item != null)
+                                    {
+                                        VvVRewards.OnRewardItemCreated(from, item);
+
+                                        if (item is GargishCrimsonCincture)
+                                        {
+                                            ((GargishCrimsonCincture)item).Attributes.BonusDex = 10;
+                                        }
+
+                                        if (item is GargishMaceAndShieldGlasses)
+                                        {
+                                            ((GargishMaceAndShieldGlasses)item).Attributes.WeaponDamage = 10;
+                                        }
+
+                                        if (item is GargishFoldedSteelGlasses)
+                                        {
+                                            ((GargishFoldedSteelGlasses)item).Attributes.DefendChance = 25;
+                                        }
+
+                                        if (item is GargishWizardsCrystalGlasses)
+                                        {
+                                            ((GargishWizardsCrystalGlasses)item).PhysicalBonus = 5;                                            
+                                            ((GargishWizardsCrystalGlasses)item).FireBonus = 5;                                            
+                                            ((GargishWizardsCrystalGlasses)item).ColdBonus = 5;                                            
+                                            ((GargishWizardsCrystalGlasses)item).PoisonBonus = 5;                                            
+                                            ((GargishWizardsCrystalGlasses)item).EnergyBonus = 5;
+                                        }
+
+                                        from.AddToBackpack(item);
+                                        dropped.Delete();
+
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            SayTo(from, 1157365); // I'm sorry, I cannot accept this item.
+            return false;
         }
 
         public SilverTrader(Serial serial) : base(serial)
@@ -128,13 +211,21 @@ namespace Server.Engines.VvV
         public override void Serialize(GenericWriter writer)
         {
             base.Serialize(writer);
-            writer.Write(0);
+            writer.Write(1);
         }
 
         public override void Deserialize(GenericReader reader)
         {
             base.Deserialize(reader);
             int version = reader.ReadInt();
+
+            if (version == 0)
+            {
+                Timer.DelayCall(() =>
+                    {
+                        ColUtility.SafeDelete<Item>(Backpack.Items, null);
+                    });
+            }
 
             Timer.DelayCall(TimeSpan.FromSeconds(5), StockInventory);
         }

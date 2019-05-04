@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+
 using Server.Mobiles;
 
 namespace Server.Items
@@ -22,7 +25,7 @@ namespace Server.Items
             }
         }
 
-        public override bool RequiresTactics(Mobile from)
+        public override bool RequiresSecondarySkill(Mobile from)
         {
             BaseWeapon weapon = from.Weapon as BaseWeapon;
 
@@ -38,6 +41,13 @@ namespace Server.Items
                 return;
 
             ClearCurrentAbility(attacker);
+
+            if (IsImmune(defender))
+            {
+                attacker.SendLocalizedMessage(1111827); // Your opponent is gripping their weapon too tightly to be disarmed.
+                defender.SendLocalizedMessage(1111828); // You will not be caught off guard by another disarm attack for some time.
+                return;
+            }
 
             Item toDisarm = defender.FindItemOnLayer(Layer.OneHanded);
 
@@ -56,16 +66,6 @@ namespace Server.Items
             }
             else if (this.CheckMana(attacker, true))
             {
-                // Skill Masteries
-                int saveChance = Server.Spells.SkillMasteries.MasteryInfo.SavingThrowChance(defender);
-
-                if (saveChance > 0 && saveChance >= Utility.Random(100))
-                {
-                    attacker.SendLocalizedMessage(1156033); // Your disarm attempt was blocked!
-                    defender.SendLocalizedMessage(1156034); // You blocked a disarm attempt!
-                    return;
-                }
-
                 attacker.SendLocalizedMessage(1060092); // You disarm their weapon!
                 defender.SendLocalizedMessage(1060093); // Your weapon has been disarmed!
 
@@ -78,7 +78,7 @@ namespace Server.Items
 
                 BaseWeapon.BlockEquip(defender, BlockEquipDuration);
 
-                if (defender is BaseCreature && ((BaseCreature)defender).AutoRearms)
+                if (defender is BaseCreature && _AutoRearms.Any(t => t == defender.GetType()))
                 {
                     Timer.DelayCall(BlockEquipDuration + TimeSpan.FromSeconds(Utility.RandomMinMax(3, 10)), () =>
                     {
@@ -86,7 +86,36 @@ namespace Server.Items
                             defender.EquipItem(toDisarm);
                     });
                 }
+
+                if(Core.SA)
+                    AddImmunity(defender, Core.TOL && attacker.Weapon is Fists ? TimeSpan.FromSeconds(10) : TimeSpan.FromSeconds(15));
             }
+        }
+
+        private Type[] _AutoRearms =
+        {
+            typeof(BritannianInfantry)
+        };
+
+        public static List<Mobile> _Immunity;
+
+        public static bool IsImmune(Mobile m)
+        {
+            return _Immunity != null && _Immunity.Contains(m);
+        }
+
+        public static void AddImmunity(Mobile m, TimeSpan duration)
+        {
+            if (_Immunity == null)
+                _Immunity = new List<Mobile>();
+
+            _Immunity.Add(m);
+
+            Timer.DelayCall<Mobile>(duration, mob =>
+                {
+                    if (_Immunity != null && _Immunity.Contains(mob))
+                        _Immunity.Remove(mob);
+                }, m);
         }
     }
 }

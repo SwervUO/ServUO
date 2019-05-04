@@ -2,9 +2,11 @@ using System;
 using Server.Mobiles;
 
 namespace Server.Items
-{ 
+{
     public class DuelistsEdge : BaseTalisman
     {
+		public override bool IsArtifact { get { return true; } }
+		
         [Constructable]
         public DuelistsEdge()
             : base(0x2F58)

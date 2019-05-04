@@ -8,7 +8,7 @@ using Server.Spells.Necromancy;
 
 namespace Server.Engines.VvV
 {
-	public enum TrapType
+	public enum VvVTrapType
 	{
 		Explosion 	= 1015027, // Explosion
 		Poison 		= 1028000, // Poison
@@ -22,8 +22,8 @@ namespace Server.Engines.VvV
 		Proximaty = 1154939,
 		Tripwire = 1154940
 	}
-	
-	public class VvVTrap : Item
+
+    public class VvVTrap : Item, IRevealableItem
 	{
         [CommandProperty(AccessLevel.GameMaster)]
 		public Mobile Owner { get; set; }
@@ -37,10 +37,11 @@ namespace Server.Engines.VvV
         public List<VvVTrap> Links { get; set; }
 		
 		public override bool HandlesOnMovement { get { return true; } }
-		
+        public bool CheckWhenHidden { get { return true; } }
+
 		public virtual int MinDamage { get { return 0; } }
 		public virtual int MaxDamage { get { return 0; } }
-        public virtual TrapType TrapType { get { return TrapType.Explosion; } }
+        public virtual VvVTrapType TrapType { get { return VvVTrapType.Explosion; } }
 
         public static int HiddenID = 8600;
         public static int VisibleID = 39818;
@@ -92,14 +93,15 @@ namespace Server.Engines.VvV
 			{
 				Detonate(m);
 			}
-            else if (m.InRange(this.Location, 8))
-            {
-                int skill = (int)m.Skills[SkillName.DetectHidden].Value;
-
-                if(skill >= 80 && Utility.Random(600) < skill)
-                this.PrivateOverheadMessage(Server.Network.MessageType.Regular, 0x21, 500813, m.NetState); // [trapped]
-            }
 		}
+
+        public bool CheckReveal(Mobile m)
+        {
+            if (!ViceVsVirtueSystem.IsVvV(m) || ItemID != VvVTrap.HiddenID)
+                return false;
+
+            return Utility.Random(100) <= m.Skills[SkillName.DetectHidden].Value;
+        }
 
         public void OnRevealed(Mobile m)
         {
@@ -121,6 +123,19 @@ namespace Server.Engines.VvV
 
                 ParentTrap.OnRevealed(m);
             }
+        }
+
+        public bool CheckPassiveDetect(Mobile m)
+        {
+            if (m.InRange(this.Location, 6))
+            {
+                int skill = (int)m.Skills[SkillName.DetectHidden].Value;
+
+                if (skill >= 80 && Utility.Random(600) < skill)
+                    this.PrivateOverheadMessage(Server.Network.MessageType.Regular, 0x21, 500813, m.NetState); // [trapped]
+            }
+
+            return false;
         }
 		
 		public override bool OnMoveOver(Mobile m)
@@ -260,7 +275,7 @@ namespace Server.Engines.VvV
 	{
 		public override int MinDamage { get { return 25; } }
 		public override int MaxDamage { get { return 35; } }
-        public override TrapType TrapType { get { return TrapType.Poison; } }
+        public override VvVTrapType TrapType { get { return VvVTrapType.Poison; } }
 
         public VvVPoisonTrap(Mobile owner, DeploymentType type)
             : base(owner, type)
@@ -304,7 +319,7 @@ namespace Server.Engines.VvV
 	{
 		public override int MinDamage { get { return 25; } }
 		public override int MaxDamage { get { return 35; } }
-        public override TrapType TrapType { get { return TrapType.Cold; } }
+        public override VvVTrapType TrapType { get { return VvVTrapType.Cold; } }
 
         public VvVColdTrap(Mobile owner, DeploymentType type)
             : base(owner, type)
@@ -350,7 +365,7 @@ namespace Server.Engines.VvV
 	{
 		public override int MinDamage { get { return 25; } }
 		public override int MaxDamage { get { return 35; } }
-        public override TrapType TrapType { get { return TrapType.Energy; } }
+        public override VvVTrapType TrapType { get { return VvVTrapType.Energy; } }
 
         public VvVEnergyTrap(Mobile owner, DeploymentType type)
             : base(owner, type)
@@ -393,7 +408,7 @@ namespace Server.Engines.VvV
 	{
 		public override int MinDamage { get { return 25; } }
 		public override int MaxDamage { get { return 35; } }
-        public override TrapType TrapType { get { return TrapType.Blade; } }
+        public override VvVTrapType TrapType { get { return VvVTrapType.Blade; } }
 
         public VvVBladeTrap(Mobile owner, DeploymentType type)
             : base(owner, type)

@@ -67,9 +67,7 @@ namespace Server.Items
                         else
                         {
                             BaseAddon addon = Deed.DeployAddon(east, p, map);
-                            house.Addons.Add(addon);
-
-                            Deed.Delete();
+                            house.Addons[addon] = from;
                         }
 					}
 
@@ -100,6 +98,8 @@ namespace Server.Items
 				Server.Spells.SpellHelper.GetSurfaceTop( ref p );
 				
 				addon.MoveToWorld(new Point3D(p), map);
+
+                Delete();
 			}
 
             return addon;

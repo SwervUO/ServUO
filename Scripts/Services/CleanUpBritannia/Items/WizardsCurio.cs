@@ -5,6 +5,8 @@ namespace Server.Items
 { 
     public class WizardsCurio : BaseTalisman
     {
+		public override bool IsArtifact { get { return true; } }
+		
         [Constructable]
         public WizardsCurio()
             : base(0x2F58)

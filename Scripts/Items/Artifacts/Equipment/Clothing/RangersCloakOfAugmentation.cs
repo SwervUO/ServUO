@@ -13,12 +13,11 @@ namespace Server.Items
         [Constructable]
         public RangersCloakOfAugmentation()
         {
-            this.Hue = 0x54A;
-
-            this.SAAbsorptionAttributes.EaterKinetic = 5;
-            this.Attributes.SpellDamage = 3;
-            this.Attributes.LowerManaCost = 1;
-            this.Attributes.WeaponSpeed = 5;
+            Hue = 0x54A;
+            SAAbsorptionAttributes.EaterKinetic = 5;
+            Attributes.SpellDamage = 3;
+            Attributes.LowerManaCost = 1;
+            Attributes.WeaponSpeed = 5;
         }
 
         public RangersCloakOfAugmentation(Serial serial)

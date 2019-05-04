@@ -12,12 +12,12 @@ namespace Server.Items
         public ConjurersTrinket()
             : base(0x2F58)
         {
-            this.Hue = 1157;
-            this.Slayer = TalismanSlayerName.Undead;
-            this.Attributes.BonusStr = 1;
-            this.Attributes.RegenHits = 2;
-            this.Attributes.WeaponDamage = 20;
-            this.Attributes.AttackChance = 10;
+            Hue = 1157;
+            Slayer = TalismanSlayerName.Undead;
+            Attributes.BonusStr = 1;
+            Attributes.RegenHits = 2;
+            Attributes.WeaponDamage = 20;
+            Attributes.AttackChance = 10;
         }
 
         public ConjurersTrinket(Serial serial)

@@ -1,6 +1,7 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using Server.Targeting;
+using Server.Spells.First;
 
 namespace Server.Spells.Fourth
 {
@@ -13,7 +14,9 @@ namespace Server.Spells.Fourth
             Reagent.Nightshade,
             Reagent.Garlic,
             Reagent.SulfurousAsh);
-        private static readonly Hashtable m_UnderEffect = new Hashtable();
+
+        private static readonly Dictionary<Mobile, Timer> m_UnderEffect = new Dictionary<Mobile, Timer>();
+
         public CurseSpell(Mobile caster, Item scroll)
             : base(caster, scroll, m_Info)
         {
@@ -26,84 +29,151 @@ namespace Server.Spells.Fourth
                 return SpellCircle.Fourth;
             }
         }
-        public static void RemoveEffect(object state)
+
+        public static void AddEffect(Mobile m, TimeSpan duration, int strOffset, int dexOffset, int intOffset)
         {
-            Mobile m = (Mobile)state;
+            if (m == null)
+                return;
 
-            m_UnderEffect.Remove(m);
+            if (m_UnderEffect.ContainsKey(m))
+            {
+                m_UnderEffect[m].Stop();
+                m_UnderEffect[m] = null;
+            }
 
+            // my spell is stronger, so lets remove the lesser spell
+            if (WeakenSpell.IsUnderEffects(m) && SpellHelper.GetCurseOffset(m, StatType.Str) <= strOffset)
+            {
+                WeakenSpell.RemoveEffects(m, false);
+            }
+
+            if (ClumsySpell.IsUnderEffects(m) && SpellHelper.GetCurseOffset(m, StatType.Dex) <= dexOffset)
+            {
+                ClumsySpell.RemoveEffects(m, false);
+            }
+
+            if (FeeblemindSpell.IsUnderEffects(m) && SpellHelper.GetCurseOffset(m, StatType.Int) <= intOffset)
+            {
+                FeeblemindSpell.RemoveEffects(m, false);
+            }
+
+            m_UnderEffect[m] = Timer.DelayCall<Mobile>(duration, RemoveEffect, m); //= new CurseTimer(m, duration, strOffset, dexOffset, intOffset);
+            m.UpdateResistances();
+        }
+
+        public static void RemoveEffect(Mobile m)
+        {
+            if(!WeakenSpell.IsUnderEffects(m))
+                m.RemoveStatMod("[Magic] Str Curse");
+
+            if(!ClumsySpell.IsUnderEffects(m))
+                m.RemoveStatMod("[Magic] Dex Curse");
+
+            if(!FeeblemindSpell.IsUnderEffects(m))
+                m.RemoveStatMod("[Magic] Int Curse");
+
+            BuffInfo.RemoveBuff(m, BuffIcon.Curse);
+
+            if(m_UnderEffect.ContainsKey(m))
+            {
+                Timer t = m_UnderEffect[m];
+                
+                if(t != null)
+                    t.Stop();
+                
+                m_UnderEffect.Remove(m);
+            }
+            
             m.UpdateResistances();
         }
 
         public static bool UnderEffect(Mobile m)
         {
-            return m_UnderEffect.Contains(m);
+            return m_UnderEffect.ContainsKey(m);
         }
 
         public override void OnCast()
         {
-            this.Caster.Target = new InternalTarget(this);
+            Caster.Target = new InternalTarget(this);
         }
 
-		public static void DoCurse(Mobile caster, Mobile m, bool masscurse)
-		{
-			SpellHelper.AddStatCurse(caster, m, StatType.Str);
-			SpellHelper.DisableSkillCheck = true;
-			SpellHelper.AddStatCurse(caster, m, StatType.Dex);
-			SpellHelper.AddStatCurse(caster, m, StatType.Int);
-			SpellHelper.DisableSkillCheck = false;
+        public static bool DoCurse(Mobile caster, Mobile m, bool masscurse)
+        {
+            if (Mysticism.StoneFormSpell.CheckImmunity(m))
+            {
+                caster.SendLocalizedMessage(1080192); // Your target resists your ability reduction magic.
+                return true;
+            }
 
-			int percentage = (int)(SpellHelper.GetOffsetScalar(caster, m, true) * 100);
-			TimeSpan length = SpellHelper.GetDuration(caster, m);
-			string args;
+            int oldStr = SpellHelper.GetCurseOffset(m, StatType.Str);
+            int oldDex = SpellHelper.GetCurseOffset(m, StatType.Dex);
+            int oldInt = SpellHelper.GetCurseOffset(m, StatType.Int);
 
-		    	if (masscurse)
-		    	{
-				args = String.Format("{0}\t{0}\t{0}", percentage);
-				BuffInfo.AddBuff(m, new BuffInfo(BuffIcon.MassCurse, 1075839, length, m, args));
-		    	}
-		    	else
-		    	{
-				args = String.Format("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}", percentage, percentage, percentage, 10, 10, 10, 10);
-				BuffInfo.AddBuff(m, new BuffInfo(BuffIcon.Curse, 1075835, 1075836, length, m, args.ToString()));
-		    	}
+            int newStr = SpellHelper.GetOffset(caster, m, StatType.Str, true, true);
+            int newDex = SpellHelper.GetOffset(caster, m, StatType.Dex, true, true);
+            int newInt = SpellHelper.GetOffset(caster, m, StatType.Int, true, true);
 
-			Timer t = (Timer)m_UnderEffect[m];
+            if ((-newStr > oldStr && -newDex > oldDex && -newInt > oldInt) || 
+                (newStr == 0 && newDex == 0 && newInt == 0))
+            {
+                return false;
+            }
 
-			if (caster.Player && m.Player /*&& Caster != m */ && t == null)    //On OSI you CAN curse yourself and get this effect.
-			{
-				TimeSpan duration = SpellHelper.GetDuration(caster, m);
-				m_UnderEffect[m] = t = Timer.DelayCall(duration, new TimerStateCallback(RemoveEffect), m);
-				m.UpdateResistances();
-			}
+            SpellHelper.AddStatCurse(caster, m, StatType.Str, false);
+            SpellHelper.AddStatCurse(caster, m, StatType.Dex, true);
+            SpellHelper.AddStatCurse(caster, m, StatType.Int, true);
 
-			if (m.Spell != null)
-				m.Spell.OnCasterHurt();
+            int percentage = (int)(SpellHelper.GetOffsetScalar(caster, m, true) * 100);
+            TimeSpan length = SpellHelper.GetDuration(caster, m);
+            string args;
 
-			m.Paralyzed = false;
+            if (masscurse)
+            {
+                args = String.Format("{0}\t{0}\t{0}", percentage);
+                BuffInfo.AddBuff(m, new BuffInfo(BuffIcon.MassCurse, 1075839, length, m, args));
+            }
+            else
+            {
+                args = String.Format("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}", percentage, percentage, percentage, 10, 10, 10, 10);
+                BuffInfo.AddBuff(m, new BuffInfo(BuffIcon.Curse, 1075835, 1075836, length, m, args.ToString()));
+            }
 
-			m.FixedParticles(0x374A, 10, 15, 5028, EffectLayer.Waist);
-			m.PlaySound(0x1E1);
-		}
+            AddEffect(m, SpellHelper.GetDuration(caster, m), oldStr, oldDex, oldInt);
+
+            if (m.Spell != null)
+                m.Spell.OnCasterHurt();
+
+            m.Paralyzed = false;
+
+            m.FixedParticles(0x374A, 10, 15, 5028, EffectLayer.Waist);
+            m.PlaySound(0x1E1);
+
+            return true;
+        }
 
 		public void Target(Mobile m)
         {
-            if (!this.Caster.CanSee(m))
+            if (!Caster.CanSee(m))
             {
-                this.Caster.SendLocalizedMessage(500237); // Target can not be seen.
+                Caster.SendLocalizedMessage(500237); // Target can not be seen.
             }
-            else if (this.CheckHSequence(m))
+            else if (CheckHSequence(m))
             {
-                SpellHelper.Turn(this.Caster, m);
+                SpellHelper.Turn(Caster, m);
 
-                SpellHelper.CheckReflect((int)this.Circle, this.Caster, ref m);
+                SpellHelper.CheckReflect((int)Circle, Caster, ref m);
 
-				DoCurse(this.Caster, m, false);
-
-				this.HarmfulSpell(m);
+                if (DoCurse(Caster, m, false))
+                {
+                    HarmfulSpell(m);
+                }
+                else
+                {
+                    DoHurtFizzle();
+                }
 			}
 
-			this.FinishSequence();
+			FinishSequence();
         }
 
         private class InternalTarget : Target
@@ -112,18 +182,18 @@ namespace Server.Spells.Fourth
             public InternalTarget(CurseSpell owner)
                 : base(Core.ML ? 10 : 12, false, TargetFlags.Harmful)
             {
-                this.m_Owner = owner;
+                m_Owner = owner;
             }
 
             protected override void OnTarget(Mobile from, object o)
             {
                 if (o is Mobile)
-                    this.m_Owner.Target((Mobile)o);
+                    m_Owner.Target((Mobile)o);
             }
 
             protected override void OnTargetFinish(Mobile from)
             {
-                this.m_Owner.FinishSequence();
+                m_Owner.FinishSequence();
             }
         }
     }

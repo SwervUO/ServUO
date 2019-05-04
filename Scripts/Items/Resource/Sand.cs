@@ -5,6 +5,8 @@ namespace Server.Items
     [FlipableAttribute(0x11EA, 0x11EB)]
     public class Sand : Item, ICommodity
     {
+        public override double DefaultWeight { get { return 0.1; } }
+
         [Constructable]
         public Sand()
             : this(1)
@@ -15,8 +17,11 @@ namespace Server.Items
         public Sand(int amount)
             : base(0x11EA)
         {
-            this.Stackable = Core.ML;
-            this.Weight = 1.0;
+            if (Core.ML)
+            {
+                Stackable = true;
+                Amount = amount;
+            }
         }
 
         public Sand(Serial serial)
@@ -31,7 +36,7 @@ namespace Server.Items
                 return 1044626;
             }
         }// sand
-        int ICommodity.DescriptionNumber
+        TextDefinition ICommodity.Description
         {
             get
             {

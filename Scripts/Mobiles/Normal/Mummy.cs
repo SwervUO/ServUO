@@ -41,7 +41,7 @@ namespace Server.Mobiles
             this.VirtualArmor = 50;
 
             if (Core.ML && Utility.RandomDouble() < .33)
-                this.PackItem(Engines.Plants.Seed.RandomPeculiarSeed(2));
+                this.PackItem(Engines.Plants.Seed.RandomPeculiarSeed(3));
 
             this.PackItem(new Garlic(5));
             this.PackItem(new Bandage(10));
@@ -66,6 +66,9 @@ namespace Server.Mobiles
                 return Poison.Lesser;
             }
         }
+
+        public override TribeType Tribe { get { return TribeType.Undead; } }
+
         public override OppositionGroup OppositionGroup
         {
             get

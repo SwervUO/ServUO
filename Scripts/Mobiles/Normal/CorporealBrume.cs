@@ -86,16 +86,19 @@ namespace Server.Mobiles
                 return 100;
             }
         }
-        public override void GenerateLoot()
-        {
-            this.AddLoot(LootPack.FilthyRich);
-            this.AddLoot(LootPack.Rich);
-        }
 
         public override void AuraEffect(Mobile m)
         {
             m.FixedParticles(0x374A, 10, 15, 5038, 1181, 2, EffectLayer.Head);
             m.PlaySound(0x213);
+
+            m.SendLocalizedMessage(1008111, false, this.Name); //  : The intense cold is damaging you!
+        }
+
+        public override void GenerateLoot()
+        {
+            this.AddLoot(LootPack.FilthyRich);
+            this.AddLoot(LootPack.Rich);
         }
 
         public override void Serialize(GenericWriter writer)

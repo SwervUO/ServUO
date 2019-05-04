@@ -36,7 +36,7 @@ namespace Server.Engines.Shadowguard
             Bottles = new List<ShadowguardBottleOfLiquor>();
             Wave = 0;
 
-            int toSpawn = 5 + (PartySize() * 2);
+            int toSpawn = Math.Max(3, PartySize() * 3);
 
             for (int i = 0; i < toSpawn; i++)
                 SpawnRandomPirate();
@@ -47,7 +47,7 @@ namespace Server.Engines.Shadowguard
 		
 		public override void CheckEncounter()
 		{
-			if(Wave >= 4 || Bottles == null)
+			if(Completed || Bottles == null)
 				return;
 
             int liquorCount = Bottles.Where(b => b != null && !b.Deleted).Count();
@@ -109,7 +109,7 @@ namespace Server.Engines.Shadowguard
 				Wave++;
 				Pirates.Clear();
 
-                int toSpawn = 5 + (PartySize() * 2);
+                int toSpawn = Math.Max(3, PartySize() * 3);
 				
 				if(Wave < 4)
 				{
@@ -282,15 +282,16 @@ namespace Server.Engines.Shadowguard
 			if(treeCount <= 0)
 				CompleteEncounter();
 		}
-		
-		public void AddSpawn(BaseCreature bc)
-		{
-            if(Spawn != null)
-			    Spawn.Add(bc);
-		}
-		
-		public override void ClearItems()
-		{
+
+        public override void CompleteEncounter()
+        {
+            base.CompleteEncounter();
+
+            ClearSpawn();
+        }
+
+        private void ClearSpawn()
+        {
             if (Spawn != null)
             {
                 List<BaseCreature> list = new List<BaseCreature>(Spawn.Where(e => e != null && e.Alive));
@@ -303,6 +304,17 @@ namespace Server.Engines.Shadowguard
                 ColUtility.Free(Spawn);
                 Spawn = null;
             }
+        }
+
+        public void AddSpawn(BaseCreature bc)
+		{
+            if(Spawn != null)
+			    Spawn.Add(bc);
+		}
+		
+		public override void ClearItems()
+		{
+            ClearSpawn();
 
             if (Trees != null)
             {
@@ -333,7 +345,7 @@ namespace Server.Engines.Shadowguard
             if (Trees != null) Trees.ForEach(t => writer.Write(t));
 
             writer.Write(Spawn == null ? 0 : Spawn.Count);
-            if (Spawn != null) Trees.ForEach(s => writer.Write(s));
+            if (Spawn != null) Spawn.ForEach(s => writer.Write(s));
 
             writer.Write(Bones);
         }
@@ -454,7 +466,10 @@ namespace Server.Engines.Shadowguard
 		
 		public override void CheckEncounter()
 		{
-			if(Armor != null && Armor.Where(a => a != null && !a.Deleted).Count() == 0)
+            if (Completed || Armor == null)
+                return;
+
+            if (Armor.Where(a => a != null && !a.Deleted).Count() == 0)
 				CompleteEncounter();
 		}
 		
@@ -472,8 +487,31 @@ namespace Server.Engines.Shadowguard
             if(DestroyedArmor != null)
 			    DestroyedArmor.Add(item);
 		}
-		
-		public override void ClearItems()
+
+        public override void CompleteEncounter()
+        {
+            base.CompleteEncounter();
+
+            ClearSpawn();
+        }
+
+        private void ClearSpawn()
+        {
+            if (Spawn != null)
+            {
+                List<BaseCreature> list = new List<BaseCreature>(Spawn.Where(s => s != null && !s.Deleted));
+
+                foreach (BaseCreature spawn in list)
+                    spawn.Delete();
+
+                ColUtility.Free(list);
+
+                ColUtility.Free(Spawn);
+                Spawn = null;
+            }
+        }
+
+        public override void ClearItems()
 		{
             if (Armor != null)
             {
@@ -499,19 +537,6 @@ namespace Server.Engines.Shadowguard
 
                 ColUtility.Free(DestroyedArmor);
                 DestroyedArmor = null;
-            }
-
-            if (Spawn != null)
-            {
-                List<BaseCreature> list = new List<BaseCreature>(Spawn.Where(s => s != null && !s.Deleted));
-
-                foreach (BaseCreature spawn in list)
-                    spawn.Delete();
-
-                ColUtility.Free(list);
-
-                ColUtility.Free(Spawn);
-                Spawn = null;
             }
 
             if (Items != null)
@@ -741,8 +766,31 @@ namespace Server.Engines.Shadowguard
             SpawnDrain(rec1);
             SpawnDrain(rec2);
 		}
-		
-		public override void ClearItems()
+
+        public override void CompleteEncounter()
+        {
+            base.CompleteEncounter();
+
+            ClearSpawn();
+        }
+
+        private void ClearSpawn()
+        {
+            if (Elementals != null)
+            {
+                List<BaseCreature> list = new List<BaseCreature>(Elementals.Where(t => t != null && !t.Deleted));
+
+                foreach (var elemental in list)
+                    elemental.Delete();
+
+                ColUtility.Free(list);
+
+                ColUtility.Free(Elementals);
+                Elementals = null;
+            }
+        }
+
+        public override void ClearItems()
 		{
             if (ShadowguardCanals != null)
             {
@@ -757,18 +805,7 @@ namespace Server.Engines.Shadowguard
                 ShadowguardCanals = null;
             }
 
-            if (Elementals != null)
-            {
-                List<BaseCreature> list = new List<BaseCreature>(Elementals.Where(t => t != null && !t.Deleted));
-
-                foreach (var elemental in list)
-                    elemental.Delete();
-
-                ColUtility.Free(list);
-
-                ColUtility.Free(Elementals);
-                Elementals = null;
-            }
+            ClearSpawn();
 
             if (FlowCheckers != null)
             {
@@ -1257,6 +1294,19 @@ namespace Server.Engines.Shadowguard
                 Drakes = null;
             }
 
+            if (Bells != null)
+            {
+                List<Item> list = new List<Item>(Bells.Where(b => b != null && !b.Deleted));
+
+                foreach (var bell in list)
+                    bell.Delete();
+
+                ColUtility.Free(list);
+                ColUtility.Free(Bells);
+
+                Bells = null;
+            }
+
 			if(Dragon != null && Dragon.Alive)
 				Dragon.Delete();
 				
@@ -1269,9 +1319,12 @@ namespace Server.Engines.Shadowguard
             writer.Write(0);
 
             writer.Write(Dragon);
-            writer.Write(Drakes == null ? 0 : Drakes.Count);
 
+            writer.Write(Drakes == null ? 0 : Drakes.Count);
             if (Drakes != null) Drakes.ForEach(d => writer.Write(d));
+
+            writer.Write(Bells == null ? 0 : Bells.Count);
+            if (Bells != null) Bells.ForEach(b => writer.Write(b));
         }
 
         public override void Deserialize(GenericReader reader)
@@ -1279,10 +1332,12 @@ namespace Server.Engines.Shadowguard
             base.Deserialize(reader);
             int version = reader.ReadInt();
 
-            Dragon = reader.ReadMobile() as ShadowguardGreaterDragon;
-            int count = reader.ReadInt();
-
             Drakes = new List<VileDrake>();
+            Bells = new List<Item>();
+
+            Dragon = reader.ReadMobile() as ShadowguardGreaterDragon;
+            
+            int count = reader.ReadInt();
 
             for (int i = 0; i < count; i++)
             {
@@ -1290,6 +1345,16 @@ namespace Server.Engines.Shadowguard
 
                 if (d != null)
                     Drakes.Add(d);
+            }
+
+            count = reader.ReadInt();
+
+            for (int i = 0; i < count; i++)
+            {
+                FeedingBell b = reader.ReadItem() as FeedingBell;
+
+                if (b != null)
+                    Bells.Add(b);
             }
 
             if (Dragon == null || Dragon.Deleted)
@@ -1306,7 +1371,7 @@ namespace Server.Engines.Shadowguard
 		
 		private Type[] _Bosses = new Type[] { typeof(Anon), typeof(Virtuebane), typeof(Ozymandias), typeof(Juonar) };
 
-        public override TimeSpan EncounterDuration { get { return TimeSpan.FromMinutes(120); } }
+        public override TimeSpan EncounterDuration { get { return TimeSpan.MaxValue; } }
         public override TimeSpan ResetDuration { get { return TimeSpan.FromMinutes(5); } }
 
         public override Type AddonType { get { return null; } }
@@ -1351,7 +1416,14 @@ namespace Server.Engines.Shadowguard
 		public override void CheckEncounter()
 		{
 		}
-		
+
+        public override void CompleteEncounter()
+        {
+            base.CompleteEncounter();
+
+            Controller.CompleteRoof(PartyLeader);
+        }
+
 		public override void OnCreatureKilled(BaseCreature bc)
 		{
 			if(Bosses != null && bc is ShadowguardBoss && bc == CurrentBoss)
@@ -1383,12 +1455,12 @@ namespace Server.Engines.Shadowguard
             {
                 foreach (PartyMemberInfo info in p.Members)
                 {
-                    if (info.Mobile is PlayerMobile && info.Mobile.Region.IsPartOf(typeof(ShadowguardRegion)))
-                        ((PlayerMobile)info.Mobile).AddCollectionTitle(1156318); // Destroyer of the Time Rift
+                    if (info.Mobile is PlayerMobile && info.Mobile.Region.IsPartOf<ShadowguardRegion>())
+                        ((PlayerMobile)info.Mobile).AddRewardTitle(1156318); // Destroyer of the Time Rift
                 }
             }
             else if (m is PlayerMobile)
-                ((PlayerMobile)m).AddCollectionTitle(1156318); // Destroyer of the Time Rift
+                ((PlayerMobile)m).AddRewardTitle(1156318); // Destroyer of the Time Rift
         }
 		
 		public override void ClearItems()

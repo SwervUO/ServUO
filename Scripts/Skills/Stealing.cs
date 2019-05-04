@@ -1,9 +1,3 @@
-#region Header
-// **********
-// ServUO - Stealing.cs
-// **********
-#endregion
-
 #region References
 using System;
 using System.Collections;
@@ -22,12 +16,16 @@ using Server.Engines.VvV;
 
 namespace Server.SkillHandlers
 {
+    public delegate void ItemStolenEventHandler(ItemStolenEventArgs e);
+
 	public class Stealing
 	{
 		public static void Initialize()
 		{
 			SkillInfo.Table[33].Callback = OnUse;
 		}
+
+        public static event ItemStolenEventHandler ItemStolen;
 
 		public static readonly bool ClassicMode = false;
 		public static readonly bool SuspendOnMurder = false;
@@ -63,7 +61,7 @@ namespace Server.SkillHandlers
 				StealableArtifactsSpawner.StealableInstance si = null;
 				if (toSteal.Parent == null || !toSteal.Movable)
 				{
-					si = StealableArtifactsSpawner.GetStealableInstance(toSteal);
+					si = toSteal is AddonComponent ? StealableArtifactsSpawner.GetStealableInstance(((AddonComponent)toSteal).Addon) : StealableArtifactsSpawner.GetStealableInstance(toSteal);
 				}
 
 				if (!IsEmptyHanded(m_Thief))
@@ -348,10 +346,19 @@ namespace Server.SkillHandlers
 							}
 						}
 
-                        // Non-movable stealable items cannot result in the stealer getting caught
-                        if (stolen != null && stolen.Movable)
+                        // Non-movable stealable (not in fillable container) items cannot result in the stealer getting caught
+                        if (stolen != null && (root is FillableContainer || stolen.Movable))
                         {
-                            caught = (m_Thief.Skills[SkillName.Stealing].Value < Utility.Random(150));
+                            double skillValue = m_Thief.Skills[SkillName.Stealing].Value;
+
+                            if (root is FillableContainer)
+                            {
+                                caught = (Utility.Random((int)(skillValue / 2.5)) == 0); // 1 of 48 chance at 120
+                            }
+                            else
+                            {
+                                caught = (skillValue < Utility.Random(150));
+                            }
                         }
                         else
                         {
@@ -365,6 +372,8 @@ namespace Server.SkillHandlers
 							ItemFlags.SetTaken(stolen, true);
 							ItemFlags.SetStealable(stolen, false);
 							stolen.Movable = true;
+
+                            InvokeItemStoken(new ItemStolenEventArgs(stolen, m_Thief));
 
 							if (si != null)
 							{
@@ -406,6 +415,13 @@ namespace Server.SkillHandlers
 						root = target;
 						stolen = TryStealItem(pack.Items[randomIndex], ref caught);
 					}
+
+                    #region Monster Stealables
+                    if (target is BaseCreature && from is PlayerMobile)
+                    {
+                        Server.Engines.CreatureStealing.StealingHandler.HandleSteal(target as BaseCreature, from as PlayerMobile);
+                    }
+                    #endregion
 				}
 				else
 				{
@@ -414,7 +430,16 @@ namespace Server.SkillHandlers
 
 				if (stolen != null)
 				{
-					from.AddToBackpack(stolen);
+                    if (stolen is AddonComponent)
+                    {
+                        BaseAddon addon = ((AddonComponent)stolen).Addon as BaseAddon;
+                        from.AddToBackpack(addon.Deed);
+                        addon.Delete();
+                    }
+                    else
+                    {
+                        from.AddToBackpack(stolen);
+                    }
 
 					if (!(stolen is Container || stolen.Stackable))
 					{
@@ -500,6 +525,14 @@ namespace Server.SkillHandlers
 
 			return TimeSpan.FromSeconds(10.0);
 		}
+
+        public static void InvokeItemStoken(ItemStolenEventArgs e)
+        {
+            if (ItemStolen != null)
+            {
+                ItemStolen(e);
+            }
+        }
 	}
 
 	public class StolenItem
@@ -598,4 +631,16 @@ namespace Server.SkillHandlers
 			}
 		}
 	}
+
+    public class ItemStolenEventArgs : EventArgs
+    {
+        public Item Item { get; set; }
+        public Mobile Mobile { get; set; }
+
+        public ItemStolenEventArgs(Item item, Mobile thief)
+        {
+            Mobile = thief;
+            Item = item;
+        }
+    }
 }

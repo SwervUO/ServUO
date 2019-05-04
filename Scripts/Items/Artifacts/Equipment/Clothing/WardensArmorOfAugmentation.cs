@@ -11,12 +11,11 @@ namespace Server.Items
         [Constructable]
         public WardensArmorOfAugmentation()
         {
-            this.Hue = 0x9C2;
-
-            this.AbsorptionAttributes.EaterKinetic = 5;
-            this.Attributes.SpellDamage = 3;
-            this.Attributes.LowerManaCost = 1;
-            this.Attributes.WeaponSpeed = 5;
+            Hue = 0x9C2;
+            AbsorptionAttributes.EaterKinetic = 5;
+            Attributes.SpellDamage = 3;
+            Attributes.LowerManaCost = 1;
+            Attributes.WeaponSpeed = 5;
         }
 
         public WardensArmorOfAugmentation(Serial serial)

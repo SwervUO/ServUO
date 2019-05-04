@@ -1,11 +1,12 @@
 using System;
+using Server.Engines.Craft;
 
 namespace Server.Items
 {
     [Flipable(0x4644, 0x4645)]     
-    public class GargishGlasses : BaseArmor
+    public class GargishGlasses : BaseArmor, IRepairable
 	{
-		public override bool IsArtifact { get { return true; } }
+        public CraftSystem RepairSystem { get { return DefTinkering.CraftSystem; } }
 
         public override Race RequiredRace { get { return Race.Gargoyle; } }
         public override bool CanBeWornByGargoyles { get { return true; } }
@@ -16,9 +17,9 @@ namespace Server.Items
         public GargishGlasses()
             : base(0x4644)
         {
-            this.Layer = Layer.Earrings;       
-            this.Weight = 2;
-            this.m_AosWeaponAttributes = new AosWeaponAttributes(this);
+            Layer = Layer.Earrings;       
+            Weight = 2;
+            m_AosWeaponAttributes = new AosWeaponAttributes(this);
         }
 
         public GargishGlasses(Serial serial)
@@ -190,6 +191,14 @@ namespace Server.Items
 
             if ((prop = this.m_AosWeaponAttributes.HitLeechStam) != 0)
                 list.Add(1060430, prop.ToString()); // hit stamina leech ~1_val~%
+        }
+
+        public override void OnAfterDuped(Item newItem)
+        {
+            base.OnAfterDuped(newItem);
+
+            if (newItem is GargishGlasses)
+                ((GargishGlasses)newItem).m_AosWeaponAttributes = new AosWeaponAttributes(newItem, m_AosWeaponAttributes);
         }
 
         public override void Serialize(GenericWriter writer)

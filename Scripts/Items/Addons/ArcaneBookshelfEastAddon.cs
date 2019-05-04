@@ -9,6 +9,8 @@ namespace Server.Items
         public override int DefaultGumpID { get { return 0x107; } }
         public override int DefaultDropSound { get { return 0x42; } }
 
+        public override bool ForceShowProperties { get { return true; } }
+
         [Constructable]
         public ArcaneBookShelfAddonEast()
             : base(0x3086)
@@ -118,7 +120,7 @@ namespace Server.Items
 
                 var addon = new ArcaneBookShelfAddonSouth();
                 addon.MoveToWorld(p, map);
-                house.Addons.Add(addon);
+                house.Addons[addon] = house.Owner;
             }
         }
     }
@@ -190,10 +192,10 @@ namespace Server.Items
                     house.LockDowns.Remove(this);
                     house.LockDowns.Add(deed, house.Owner);
                 }
-                else if (house != null && house.Secures.Contains(this))
+                else if (house != null && house.IsSecure(this))
                 {
-                    house.Secures.Remove(this);
-                    house.Secures.Add(deed);
+                    house.ReleaseSecure(house.Owner, this);
+                    house.AddSecure(house.Owner, deed);
                 }
             }
 

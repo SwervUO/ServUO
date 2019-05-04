@@ -59,6 +59,9 @@ namespace Server.Mobiles
             _NextEggThrow = DateTime.UtcNow;
 
             _Spawn = new List<BaseCreature>();
+
+            Fame = 35000;
+            Karma = -35000;
         }
 
         public override void GenerateLoot()
@@ -231,9 +234,9 @@ namespace Server.Mobiles
                     });
  
                 AOS.Damage(target, this, Utility.RandomMinMax(80, 100), 100, 0, 0, 0, 0);
-                target.Send(SpeedControl.WalkSpeed);
+                target.SendSpeedControl(SpeedControlType.WalkSpeed);
 
-                Timer.DelayCall(TimeSpan.FromSeconds(5), () => target.Send(SpeedControl.Disable));
+                Timer.DelayCall(TimeSpan.FromSeconds(5), () => target.SendSpeedControl(SpeedControlType.Disable));
             }
 
             ColUtility.Free(random);
@@ -464,6 +467,12 @@ namespace Server.Mobiles
 
             _NextMastery = DateTime.UtcNow;
             _NextSpecial = DateTime.UtcNow;
+
+            Fame = 35000;
+            Karma = -35000;
+
+            SetWeaponAbility(WeaponAbility.Disarm);
+            SetWeaponAbility(WeaponAbility.ParalyzingBlow);
         }
 
         public override bool TeleportsTo { get { return true; } }
@@ -491,11 +500,6 @@ namespace Server.Mobiles
 
             ColUtility.Free(list);
             return mob;
-        }
-
-        public override WeaponAbility GetWeaponAbility()
-        {
-            return 0.5 > Utility.RandomDouble() ? WeaponAbility.Disarm : WeaponAbility.ParalyzingBlow;
         }
 
         public override void OnThink()
@@ -538,7 +542,7 @@ namespace Server.Mobiles
             int dist = 4;
             Point3D p = Point3D.Zero;
 
-            IPooledEnumerable eable = this.Map.GetMobilesInRange(this.Location, dist);
+            IPooledEnumerable eable = map.GetMobilesInRange(Location, dist);
 
             foreach (Mobile m in eable)
             {
@@ -579,7 +583,7 @@ namespace Server.Mobiles
 
             Timer.DelayCall(TimeSpan.FromMilliseconds(Utility.RandomMinMax(300, 350) * (_Offsets.Length / 2)), () =>
                 {
-                    eable = this.Map.GetMobilesInRange(this.Location, dist);
+                    eable = map.GetMobilesInRange(this.Location, dist);
 
                     foreach (Mobile m in eable)
                     {
@@ -602,16 +606,16 @@ namespace Server.Mobiles
                                 Movement.Movement.Offset(d, ref x, ref y);
                                 int z = map.GetAverageZ(x, y);
 
-                                if (!this.Map.CanFit(new Point3D(x, y, z), 16, false, false))
+                                if (!map.CanFit(new Point3D(x, y, z), 16, false, false))
                                 {
-                                    m.MoveToWorld(new Point3D(lastx, lasty, this.Map.GetAverageZ(lastx, lasty)), this.Map);
+                                    m.MoveToWorld(new Point3D(lastx, lasty, map.GetAverageZ(lastx, lasty)), map);
                                     AOS.Damage(m, this, Utility.RandomMinMax(100, 150), 0, 0, 0, 0, 100);
                                     break;
                                 }
 
                                 if (range >= 15 && (orx != x || ory != y))
                                 {
-                                    m.MoveToWorld(new Point3D(x, y, z), this.Map);
+                                    m.MoveToWorld(new Point3D(x, y, z), map);
                                     AOS.Damage(m, this, Utility.RandomMinMax(100, 150), 0, 0, 0, 0, 100);
                                 }
                             }
@@ -703,33 +707,43 @@ namespace Server.Mobiles
     {
         public override bool AlwaysMurderer { get { return true; } }
 
+        [Constructable]
         public IgnisFatalis()
-            : base(AIType.AI_Melee, FightMode.Closest, 10, 1, 0.15, 0.3)
+            : base(AIType.AI_Spellweaving, FightMode.Closest, 10, 1, 0.15, 0.3)
         {
-            Body = 0x104;
+            Body = 0x105;
             Name = "Ignis Fatalis";
             BaseSoundID = 0x56B;
 
-            SetHits(250);
-            SetStr(100, 150);
+            SetHits(500);
+            SetStr(350, 360);
             SetDex(100, 150);
-            SetInt(100, 150);
+            SetInt(580, 620);
 
-            SetDamage(15, 18);
+            SetDamage(15, 22);
 
-            SetDamageType(ResistanceType.Physical, 50);
-            SetDamageType(ResistanceType.Energy, 50);
+            SetDamageType(ResistanceType.Physical, 0);
+            SetDamageType(ResistanceType.Energy, 100);
 
             SetResistance(ResistanceType.Physical, 40, 50);
             SetResistance(ResistanceType.Fire, 40, 50);
-            SetResistance(ResistanceType.Cold, 40, 50);
-            SetResistance(ResistanceType.Poison, 40, 50);
-            SetResistance(ResistanceType.Energy, 70, 80);
+            SetResistance(ResistanceType.Cold, 60, 70);
+            SetResistance(ResistanceType.Poison, 70, 80);
+            SetResistance(ResistanceType.Energy, 100);
 
-            SetSkill(SkillName.Wrestling, 70, 100);
-            SetSkill(SkillName.Tactics, 70, 100);
-            SetSkill(SkillName.MagicResist, 70, 100);
+            SetSkill(SkillName.Wrestling, 100);
+            SetSkill(SkillName.Tactics, 100);
+            SetSkill(SkillName.MagicResist, 100);
+            SetSkill(SkillName.DetectHidden, 100.0);
+            SetSkill(SkillName.Magery, 100.0);
+            SetSkill(SkillName.EvalInt, 100.0);
+            SetSkill(SkillName.Meditation, 100.0);
+            SetSkill(SkillName.Focus, 100.0);
+            SetSkill(SkillName.Spellweaving, 100.0);
         }
+
+        public override bool HasAura { get { return true; } }
+        public override int AuraEnergyDamage { get { return 100; } }
 
         public IgnisFatalis(Serial serial)
             : base(serial)

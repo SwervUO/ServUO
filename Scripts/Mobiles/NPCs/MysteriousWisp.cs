@@ -6,6 +6,7 @@ using Server.Engines.Despise;
 using Server.Items;
 using Server.Gumps;
 using Server.Network;
+using Server.Engines.Quests;
 
 namespace Server.Mobiles
 {
@@ -111,6 +112,44 @@ namespace Server.Mobiles
                     m_Conversation[from] = 1;
                 }
             }
+
+            if (from is PlayerMobile)
+            {
+                var pm = from as PlayerMobile;
+
+                if (QuestHelper.CheckDoneOnce(pm, typeof(WishesOfTheWispQuest), null, false))
+                {
+                    var q = QuestHelper.GetQuest<WhisperingWithWispsQuest>(pm);
+
+                    if (q == null)
+                    {
+                        BaseQuest quest = QuestHelper.RandomQuest(pm, new Type[] { typeof(WhisperingWithWispsQuest) }, this);
+
+                        if (quest != null)
+                        {
+                            pm.CloseGump(typeof(MondainQuestGump));
+                            pm.SendGump(new MondainQuestGump(quest));
+                        }
+                    }
+                    else if (q.Completed)
+                    {
+                        q.CompleteQuest();
+                    }
+                }
+            }
+        }
+
+        public override void OnMovement(Mobile m, Point3D oldLocation)
+        {
+            if (m is PlayerMobile && InRange(m.Location, 5) && !InRange(oldLocation, 5))
+            {
+                WishesOfTheWispQuest quest = QuestHelper.GetQuest<WishesOfTheWispQuest>((PlayerMobile)m);
+
+                if (quest != null)
+                {
+                    quest.CompleteQuest();
+                }
+            }
         }
 
         public override void OnSpeech(SpeechEventArgs e)
@@ -188,7 +227,7 @@ namespace Server.Mobiles
 
         public void CheckRestock()
         {
-            if (m_NextRestock <= DateTime.Now)
+            if (m_NextRestock <= DateTime.UtcNow)
                 DoRestock();
         }
 
@@ -257,7 +296,7 @@ namespace Server.Mobiles
                 this.Backpack.DropItem(item);
             }
 
-            m_NextRestock = DateTime.Now + TimeSpan.FromMinutes(Utility.RandomMinMax(m_RestockMin, m_RestockMax));
+            m_NextRestock = DateTime.UtcNow + TimeSpan.FromMinutes(Utility.RandomMinMax(m_RestockMin, m_RestockMax));
         }
 
         public int GetCostFor(Item item)
@@ -354,7 +393,7 @@ namespace Server.Mobiles
             m_IntensityMax = reader.ReadInt();
             m_MutateChance = reader.ReadDouble();
 
-            m_NextRestock = DateTime.Now;
+            m_NextRestock = DateTime.UtcNow;
         }
 
         public class BuyBackpack : Backpack
@@ -497,7 +536,7 @@ namespace Server.Mobiles
                 {
                     Item item = m_Items[idx];
 
-                    if (m_Wisp.Backpack.Items.Contains(item) && !item.Deleted && item != null)
+                    if (item != null && !item.Deleted && m_Wisp.Backpack != null && m_Wisp.Backpack.Items.Contains(item))
                     {
                         from.SendGump(new InternalGump2(m_Wisp, item));
                     }

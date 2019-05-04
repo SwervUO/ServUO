@@ -10,7 +10,7 @@ namespace Server.Engines.Quests
         public Gareth()
             : base("Gareth", "the Emissary of the RBC")
         {
-            m_NextTalk = DateTime.Now;
+            m_NextTalk = DateTime.UtcNow;
         }
 
         public Gareth(Serial serial)
@@ -20,41 +20,40 @@ namespace Server.Engines.Quests
 
         public override Type[] Quests
         {
-            get
-            {
-                return new Type[] 
-                {
-                    typeof(TheQuestionsQuest),
-                };
-            }
+            get { return new Type[]  { typeof(TheQuestionsQuest) }; }
+        }
+
+        public override void OnOfferFailed()
+        {
+            Say(1075787); // I feel that thou hast yet more to learn about Humility... Please ponder these things further, and visit me again on the 'morrow.
         }
 
         public override void InitBody()
         {
-            this.InitStats(100, 100, 25);
+            InitStats(100, 100, 25);
 
-            this.Female = false;
-            this.Race = Race.Human;
-            this.Body = 0x190;
+            Female = false;
+            Race = Race.Human;
+            Body = 0x190;
 
-            this.Hue = 0x83EA;
-            this.HairItemID = 0x2049;
+            Hue = 0x83EA;
+            HairItemID = 0x2049;
         }
 
         public override void InitOutfit()
         {
-            this.AddItem(new Backpack());
-            this.AddItem(new Boots());
-            this.AddItem(new BodySash());
-            this.AddItem(new FancyShirt(6));
-            this.AddItem(new LongPants());
+            AddItem(new Backpack());
+            AddItem(new Boots());
+            AddItem(new BodySash());
+            AddItem(new FancyShirt(6));
+            AddItem(new LongPants());
         }
 
         private DateTime m_NextTalk;
 
         public override void OnMovement(Mobile m, Point3D oldLocation)
         {
-            if (m_NextTalk < DateTime.Now && m is PlayerMobile && m.Backpack != null && m.InRange(this.Location, 8))
+            if (m_NextTalk < DateTime.UtcNow && m is PlayerMobile && m.Backpack != null && m.InRange(Location, 8))
             {
                 PlayerMobile pm = (PlayerMobile)m;
 
@@ -67,7 +66,7 @@ namespace Server.Engines.Quests
                     if (chain != null && chain.QuestItem)
                     {
                         SayTo(m, 1075773);
-                        m_NextTalk = DateTime.Now + TimeSpan.FromSeconds(10);
+                        m_NextTalk = DateTime.UtcNow + TimeSpan.FromSeconds(10);
                     }
                 }
             }
@@ -76,17 +75,15 @@ namespace Server.Engines.Quests
         public override void Serialize(GenericWriter writer)
         {
             base.Serialize(writer);
-
             writer.Write((int)0); // version
         }
 
         public override void Deserialize(GenericReader reader)
         {
             base.Deserialize(reader);
-
             int version = reader.ReadInt();
 
-            m_NextTalk = DateTime.Now;
+            m_NextTalk = DateTime.UtcNow;
         }
     }
 }

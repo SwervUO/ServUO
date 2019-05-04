@@ -71,6 +71,53 @@ namespace Server.Engines.ShameRevamped
             if (Troll == null || Troll.Deleted || !Troll.Alive)
                 Reset();
         }
+
+        public static void AddTeleporters(ShameWall wall)
+        {
+            Map map = wall.Map;
+
+            if (map == null || map == Map.Internal)
+                return;
+
+            foreach (var component in wall.Components)
+            {
+                foreach (Point3D[] pnts in _TeleportLocs)
+                {
+                    if (component.Location == pnts[0])
+                    {
+                        var oldtele = map.FindItem<ConditionTeleporter>(new Point3D(pnts[1]));
+
+                        if (oldtele != null)
+                        {
+                            WeakEntityCollection.Remove("newshame", oldtele);
+                            oldtele.Delete();
+                        }
+
+                        var teleporter = new ShameWallTeleporter(pnts[2], map);
+                        teleporter.MoveToWorld(pnts[1], map);
+
+                        WeakEntityCollection.Add("newshame", teleporter);
+                    }
+                }
+            }
+        }
+
+        private static Point3D[][] _TeleportLocs =
+        {
+            new Point3D[] { new Point3D(5402, 82, 10), new Point3D(5402, 81, 10), new Point3D(5402, 83, 10) },
+            new Point3D[] { new Point3D(5403, 82, 10), new Point3D(5403, 81, 10), new Point3D(5403, 83, 10) },
+            new Point3D[] { new Point3D(5404, 82, 10), new Point3D(5404, 81, 10), new Point3D(5404, 83, 10) },
+            new Point3D[] { new Point3D(5405, 82, 10), new Point3D(5405, 81, 10), new Point3D(5405, 83, 10) },
+
+            new Point3D[] { new Point3D(5465, 25, -10), new Point3D(5464, 25, -10), new Point3D(5466, 25, -10) },
+            new Point3D[] { new Point3D(5465, 26, -10), new Point3D(5464, 26, -10), new Point3D(5466, 26, -10) },
+            new Point3D[] { new Point3D(5465, 27, -10), new Point3D(5464, 27, -10), new Point3D(5466, 27, -10) },
+            new Point3D[] { new Point3D(5465, 28, -10), new Point3D(5464, 28, -10), new Point3D(5466, 28, -10) },
+
+            new Point3D[] { new Point3D(5618, 57, 0), new Point3D(5618, 58, 0), new Point3D(5618, 56, 0) },
+            new Point3D[] { new Point3D(5619, 57, 0), new Point3D(5619, 58, 0), new Point3D(5619, 56, 0) },
+            new Point3D[] { new Point3D(5620, 57, 0), new Point3D(5620, 58, 0), new Point3D(5620, 56, 0) },
+        };
 		
 		public ShameWall(Serial serial) : base(serial)
 		{
@@ -79,7 +126,7 @@ namespace Server.Engines.ShameRevamped
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
-			writer.Write((int)0);
+			writer.Write((int)3);
 			
 			writer.Write(Troll);
 			writer.Write(StartSpot);
@@ -102,6 +149,17 @@ namespace Server.Engines.ShameRevamped
 
             if (this.Location != StartSpot || Troll == null || Troll.Deleted || !Troll.Alive)
 				Reset();
+
+            if (version == 2)
+                Timer.DelayCall(() => AddTeleporters(this));
+
+            if (version == 1 && StartSpot == new Point3D(5619, 57, 0) && StartMap == Map.Felucca)
+            {
+                Timer.DelayCall(TimeSpan.FromSeconds(20), () =>
+                    {
+                        ShameWall.AddTeleporters(this);
+                    });
+            }
 		}
 	}
 }

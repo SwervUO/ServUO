@@ -10,32 +10,35 @@ namespace Server.Engines.Shadowguard
 {
 	public class ShadowguardBoss : BaseCreature
 	{
-        public const int MaxSummons = 8;
+        public const int MaxSummons = 3;
 
 		public List<BaseCreature> SummonedHelpers { get; set; }
+
+        [CommandProperty(AccessLevel.GameMaster)]
         public bool IsLastBoss { get; set; }
 
-		public DateTime _NextSummon;
+		private DateTime _NextSummon;
 		
 		public virtual Type[] SummonTypes { get { return null; } }
 		public virtual Type[] ArtifactDrops { get { return _ArtifactTypes; } }
-		
-		private Type[] _ArtifactTypes = new Type[]
-		{
-			typeof(AnonsBoots),					typeof(AnonsBootsGargoyle),			typeof(AnonsSpellbook),			typeof(BalakaisShamanStaff),
-			typeof(BalakaisShamanStaffGargoyle),typeof(EnchantressCameo),			typeof(GrugorsShield),			typeof(GrugorsShieldGargoyle),
-			typeof(HalawasHuntingBow),			typeof(HalawasHuntingBowGargoyle),	typeof(HawkwindsRobe),			typeof(JumusSacredHide),
-			typeof(JumusSacredHideGargoyle), 	typeof(JuonarsGrimoire), 			typeof(LereisHuntingSpear), 	typeof(LereisHuntingSpearGargoyle), 
-			typeof(MinaxsSandles), 				typeof(MinaxsSandlesGargoyle), 		typeof(MocapotilsObsidianSword),typeof(OzymandiasObi),
-			typeof(OzymandiasObiGargoyle), 		typeof(ShantysWaders), 				typeof(ShantysWadersGargoyle), 	typeof(TotemOfTheTribe),
-			typeof(WamapsBoneEarrings), 		typeof(WamapsBoneEarringsGargoyle), typeof(UnstableTimeRift)
-		};
-		
-		public ShadowguardBoss(AIType ai) : base(ai, FightMode.Closest, 10, 1, .15, .3)
+
+        public virtual bool CanSummon { get { return Hits <= HitsMax - (HitsMax / 4); } }
+
+        private Type[] _ArtifactTypes = new Type[]
+        {
+            typeof(AnonsBoots),                 typeof(AnonsSpellbook),         typeof(BalakaisShamanStaff),
+            typeof(EnchantressCameo),           typeof(GrugorsShield),          typeof(WamapsBoneEarrings),
+            typeof(HalawasHuntingBow),          typeof(HawkwindsRobe),          typeof(JumusSacredHide),
+            typeof(JuonarsGrimoire),            typeof(LereisHuntingSpear),     typeof(UnstableTimeRift),
+            typeof(MinaxsSandles),              typeof(MocapotlsObsidianSword), typeof(OzymandiasObi),
+            typeof(ShantysWaders),              typeof(TotemOfTheTribe),        typeof(BalakaisShamanStaffGargoyle)
+        };
+
+        public ShadowguardBoss(AIType ai) : base(ai, FightMode.Closest, 10, 1, .15, .3)
 		{
 			_NextSummon = DateTime.UtcNow;
 			
-			SetHits(25000);
+			SetHits(9500, 10000);
 			SetMana(4500);
 			SetStam(250);
 
@@ -54,11 +57,7 @@ namespace Server.Engines.Shadowguard
         {
             if (IsLastBoss)
             {
-                this.AddLoot(LootPack.SuperBoss, 6);
-            }
-            else
-            {
-                this.AddLoot(LootPack.SuperBoss, 3);
+                this.AddLoot(LootPack.SuperBoss, 7);
             }
         }
 		
@@ -76,7 +75,7 @@ namespace Server.Engines.Shadowguard
 
 		public override void OnGotMeleeAttack(Mobile m)
 		{
-			if(_NextSummon < DateTime.UtcNow)
+            if (m is PlayerMobile && CanSummon && !(m is GreaterDragon) && _NextSummon < DateTime.UtcNow)
 				Summon();
 				
 			base.OnGotMeleeAttack(m);
@@ -84,7 +83,7 @@ namespace Server.Engines.Shadowguard
 		
 		public override void OnDamagedBySpell(Mobile m)
 		{
-			if(_NextSummon < DateTime.UtcNow)
+            if (m is PlayerMobile && CanSummon && !(m is GreaterDragon) && _NextSummon < DateTime.UtcNow)
 				Summon();
 				
 			base.OnDamagedBySpell(m);
@@ -92,37 +91,48 @@ namespace Server.Engines.Shadowguard
 		
 		public override void OnDeath(Container c)
 		{
-			List<DamageStore> rights = GetLootingRights();
-			
-			foreach(DamageStore ds in rights.Where(s => s.m_HasRight))
-			{
-				int chance = 75 + (ds.m_Mobile.Luck / 15);
-				
-				if(chance > Utility.Random(5000))
-				{
-					Mobile m = ds.m_Mobile;
-					Item artifact = Loot.Construct(ArtifactDrops[Utility.Random(ArtifactDrops.Length)]);
-					
-					if(artifact != null)
-					{
-						if(m.Backpack == null || !m.Backpack.TryDropItem(m, artifact, false))
-						{
-							m.BankBox.DropItem(artifact);
-							m.SendMessage("For your valor in combating the fallen beast, a special reward has been placed in your bankbox.");
-						}
-						else
-							m.SendLocalizedMessage(1062317); // For your valor in combating the fallen beast, a special reward has been bestowed on you.
-					}
-				}
-			}
-
             if (IsLastBoss)
-                DoGoldSpray();
+            {
+                List<DamageStore> rights = GetLootingRights();
 
+                foreach (DamageStore ds in rights.Where(s => s.m_HasRight))
+                {
+                    int luck = ds.m_Mobile is PlayerMobile ? ((PlayerMobile)ds.m_Mobile).RealLuck : ds.m_Mobile.Luck;
+
+                    int chance = 1000 + (luck / 15);
+
+                    if (chance > Utility.Random(5000))
+                    {
+                        Mobile m = ds.m_Mobile;
+                        Item artifact = Loot.Construct(ArtifactDrops[Utility.Random(ArtifactDrops.Length)]);
+
+                        if (artifact != null)
+                        {
+                            if (m.Backpack == null || !m.Backpack.TryDropItem(m, artifact, false))
+                            {
+                                m.BankBox.DropItem(artifact);
+                                m.SendMessage("For your valor in combating the fallen beast, a special reward has been placed in your bank box.");
+                            }
+                            else
+                                m.SendLocalizedMessage(1062317); // For your valor in combating the fallen beast, a special reward has been bestowed on you.
+                        }
+                    }
+                }
+            }
 			base.OnDeath(c);
 		}
 
-        private void DoGoldSpray()
+        public override bool OnBeforeDeath()
+        {
+            if (IsLastBoss)
+            {
+                DoGoldSpray(Map);
+            }
+
+            return base.OnBeforeDeath();
+        }
+
+        private void DoGoldSpray(Map map)
         {
             if (this.Map != null)
             {
@@ -133,7 +143,7 @@ namespace Server.Engines.Shadowguard
                         double dist = Math.Sqrt(x * x + y * y);
 
                         if (dist <= 12)
-                            new GoodiesTimer(this.Map, X + x, Y + y).Start();
+                            new GoodiesTimer(map, X + x, Y + y).Start();
                     }
                 }
             }
@@ -168,7 +178,7 @@ namespace Server.Engines.Shadowguard
                 if (!canFit)
                     return;
 
-                Gold g = new Gold(500, 1000); // [WarLocke] Changed to vary by champion. Originally 500, 1000.
+                Gold g = new Gold(500, 1000);
                 g.MoveToWorld(new Point3D(m_X, m_Y, z), m_Map);
 
                 if (0.5 >= Utility.RandomDouble())
@@ -203,13 +213,14 @@ namespace Server.Engines.Shadowguard
 		public virtual void Summon()
 		{
             int max = MaxSummons;
+            var map = Map;
 
             ShadowguardEncounter inst = ShadowguardController.GetEncounter(this.Location, this.Map);
 
             if(inst != null)
                 max += inst.PartySize() * 2;
 
-			if(this.Map == null || this.SummonTypes == null || this.SummonTypes.Length == 0 || TotalSummons() > max)
+			if(map == null || this.SummonTypes == null || this.SummonTypes.Length == 0 || TotalSummons() > max)
 				return;
 				
 			int count = Utility.RandomList(1, 2, 2, 2, 3, 3, 4, 5);
@@ -225,9 +236,9 @@ namespace Server.Engines.Shadowguard
 				{
 					int x = Utility.RandomMinMax(p.X - 3, p.X + 3);
 					int y = Utility.RandomMinMax(p.Y - 3, p.Y + 3);
-					int z = this.Map.GetAverageZ(x, y);
+					int z = map.GetAverageZ(x, y);
 					
-					if(this.Map.CanSpawnMobile(x, y, z))
+					if(map.CanSpawnMobile(x, y, z))
 					{
 						p = new Point3D(x, y, z);
 						break;
@@ -238,16 +249,19 @@ namespace Server.Engines.Shadowguard
 				
 				if(spawn != null)
 				{
-					spawn.MoveToWorld(p, this.Map);
+					spawn.MoveToWorld(p, map);
 					spawn.Team = this.Team;
 					spawn.SummonMaster = this;
 					
 					Timer.DelayCall(TimeSpan.FromSeconds(1), (o) =>
 					{
 						BaseCreature s = o as BaseCreature;
-						
-						if(s != null)
-							s.Combatant = this.Combatant;
+
+                        if (s != null && s.Combatant != null)
+                        {
+                            if(!(s.Combatant is PlayerMobile) || !((PlayerMobile)s.Combatant).HonorActive)
+                                s.Combatant = this.Combatant;
+                        }
 							
 					}, spawn);
 
@@ -358,42 +372,36 @@ namespace Server.Engines.Shadowguard
         [Constructable]
 		public Anon() : base(AIType.AI_Mage)
 		{
-			Name = "anon";
-			Title = "the mage";
+			Name = "Anon";
+			Title = "the Mage";
 
             Body = 0x190;
             HairItemID = 0x203C;
 
             Hue = Race.RandomSkinHue();
 
-			SetInt(225, 250);
-			SetDex(100);
+			SetStam(100, 125);
+			SetMana(800, 900);
+			SetStr(150, 200);
+			SetInt(175, 200);
+			SetDex(100, 200);
 			
-			SetDamage( 12, 17 );
+			SetDamage( 14, 17 );
 			
-			SetDamageType(ResistanceType.Physical, 50);
-			SetDamageType(ResistanceType.Energy, 50);
+			SetDamageType(ResistanceType.Physical, 100);
 			
-			SetSkill( SkillName.Wrestling, 110.0 );
-			SetSkill( SkillName.Swords, 110.0 );
-			SetSkill( SkillName.Anatomy, 10.0 );
-			SetSkill( SkillName.MagicResist,  110.0 );
+			SetSkill( SkillName.Wrestling, 220.0, 240.0 );
+			SetSkill( SkillName.Tactics, 110.0, 125.0 );
+			SetSkill( SkillName.MagicResist,  120.0 , 140.0);
 			SetSkill( SkillName.Magery, 120.0 );
 			SetSkill( SkillName.EvalInt, 150.0 );
 			SetSkill( SkillName.Meditation, 120.0 );
 			
-			SetResistance(ResistanceType.Physical, 90, 99);
-			SetResistance(ResistanceType.Fire, 50, 60);
-			SetResistance(ResistanceType.Cold, 50, 60);
-			SetResistance(ResistanceType.Poison, 50, 60);
-			SetResistance(ResistanceType.Energy, 50, 60);
-
-            SetSkill(SkillName.Wrestling, 120);
-            SetSkill(SkillName.Magery, 120);
-            SetSkill(SkillName.EvalInt, 180);
-            SetSkill(SkillName.Meditation, 200);
-            SetSkill(SkillName.Tactics, 100);
-            SetSkill(SkillName.MagicResist, 200);
+			SetResistance(ResistanceType.Physical, 65, 70);
+			SetResistance(ResistanceType.Fire, 65, 70);
+			SetResistance(ResistanceType.Cold, 65, 70);
+			SetResistance(ResistanceType.Poison, 65, 70);
+			SetResistance(ResistanceType.Energy, 65, 70);
 
 			SetWearable(new Robe(), 1320);
 			SetWearable(new WizardsHat(), 1320);
@@ -597,11 +605,6 @@ namespace Server.Engines.Shadowguard
 	{
 		public override Type[] SummonTypes { get { return _SummonTypes; } }
 		private Type[] _SummonTypes = new Type[] { typeof(SkeletalDragon), typeof(LichLord), typeof(WailingBanshee), typeof(FleshGolem) };
-		
-		public override bool CanAnimateDead{ get { return true; } }
-		public override double AnimateChance{ get{ return 0.15; } }
-		public override int AnimateScalar{ get{ return 150; } }
-		public override BaseCreature Animates{ get{ return new FleshGolem(); } }
 
         public override bool CanDiscord { get { return true; } }
         public override bool PlayInstrumentSound { get { return false; } }
@@ -609,42 +612,75 @@ namespace Server.Engines.Shadowguard
         private DateTime _NextTeleport;
 
         [Constructable]
-		public Juonar() : base(AIType.AI_NecroMage)
-		{
-			Name = "juo'nar";
+        public Juonar()
+            : base(AIType.AI_NecroMage)
+        {
+            Name = "Juo'nar";
             Body = 78;
             BaseSoundID = 412;
             Hue = 2951;
 
-			SetInt(225, 250);
-			SetDex(100);
-			
-			SetDamage( 15, 20 );
-			
-			SetDamageType(ResistanceType.Physical, 50);
-			SetDamageType(ResistanceType.Energy, 50);
-			
-			SetSkill( SkillName.Wrestling, 110.0 );
-			SetSkill( SkillName.Anatomy, 10.0 );
-			SetSkill( SkillName.MagicResist,  110.0 );
-			SetSkill( SkillName.Magery, 120.0 );
-			SetSkill( SkillName.EvalInt, 150.0 );
-			SetSkill( SkillName.Meditation, 120.0 );
-			SetSkill( SkillName.Necromancy, 120.0 );
-			SetSkill( SkillName.SpiritSpeak, 120.0 );
-            SetSkill( SkillName.Musicianship, 120.0 );
-            SetSkill( SkillName.Discordance, 120.0 );
-			
-			SetResistance(ResistanceType.Physical, 40, 50);
-			SetResistance(ResistanceType.Fire, 20, 30);
-			SetResistance(ResistanceType.Cold, 50, 60);
-			SetResistance(ResistanceType.Poison, 50, 60);
-			SetResistance(ResistanceType.Energy, 50, 60);
+            SetStam(100, 125);
+            SetMana(5000, 5500);
+            SetStr(500, 560);
+            SetInt(1000, 1200);
+            SetDex(100, 125);
+
+            SetDamage(17, 21);
+
+            SetDamageType(ResistanceType.Physical, 20);
+            SetDamageType(ResistanceType.Fire, 20);
+            SetDamageType(ResistanceType.Cold, 20);
+            SetDamageType(ResistanceType.Poison, 20);
+            SetDamageType(ResistanceType.Energy, 20);
+
+            SetSkill(SkillName.Wrestling, 120.0);
+            SetSkill(SkillName.Tactics, 100.0);
+            SetSkill(SkillName.MagicResist, 150.0);
+            SetSkill(SkillName.Magery, 100.0);
+            SetSkill(SkillName.EvalInt, 100.0);
+            SetSkill(SkillName.Meditation, 120.0);
+            SetSkill(SkillName.Necromancy, 120.0);
+            SetSkill(SkillName.SpiritSpeak, 120.0);
+
+            SetSkill(SkillName.Musicianship, 120.0);
+            SetSkill(SkillName.Discordance, 80.0);
+
+            SetResistance(ResistanceType.Physical, 30);
+            SetResistance(ResistanceType.Fire, 30);
+            SetResistance(ResistanceType.Cold, 30);
+            SetResistance(ResistanceType.Poison, 30);
+            SetResistance(ResistanceType.Energy, 30);
 
             _NextTeleport = DateTime.UtcNow;
-		}
-		
-		public Juonar(Serial serial) : base(serial)
+        }
+
+        public override void OnThink()
+        {
+            base.OnThink();
+
+            if (Combatant == null)
+                return;
+
+            if (Combatant is Mobile)
+            {
+                Mobile m = Combatant as Mobile;
+
+                if (InRange(m.Location, 10) && !InRange(m.Location, 2) && m.Alive && this.CanBeHarmful(m, false) && m.AccessLevel == AccessLevel.Player)
+                {
+                    if (_NextTeleport < DateTime.UtcNow)
+                    {
+                        _NextTeleport = DateTime.UtcNow + TimeSpan.FromSeconds(Utility.RandomMinMax(20, 30)); // too much
+
+                        m.MoveToWorld(GetSpawnPosition(1), Map);
+                        m.FixedParticles(0x376A, 9, 32, 0x13AF, EffectLayer.Waist);
+                        m.PlaySound(0x1FE);
+                    }
+                }
+            }
+        }
+
+        public Juonar(Serial serial) : base(serial)
 		{
 		}
 		
@@ -668,45 +704,42 @@ namespace Server.Engines.Shadowguard
 		public override Type[] SummonTypes { get { return _SummonTypes; } }
 		private Type[] _SummonTypes = new Type[] { typeof(MinotaurCaptain), typeof(Daemon), typeof(Titan) };
 		
-		public override bool CanAnimateDead{ get { return true; } }
-		public override double AnimateChance{ get{ return 0.15; } }
-		public override int AnimateScalar{ get{ return 150; } }
-		public override BaseCreature Animates{ get{ return new FleshGolem(); } }
         public override bool BardImmune { get { return true; } }
 
 		private DateTime _NextNuke;
 		private DateTime _NextDismount;
 
         [Constructable]
-		public Virtuebane() : base(AIType.AI_NecroMage)
+		public Virtuebane() : base(AIType.AI_Mage)
 		{
-			Name = "virtuebane";
+			Name = "Virtuebane";
 		
-			Body = 1071; // Giant monotaur?
+			Body = 1071; 
             SpeechHue = 452;
 
-			SetInt(225, 250);
-			SetDex(100);
+			SetStam(500, 650);
+			SetMana(525, 650);
+			SetStr(525, 500);
+			SetInt(525, 600);
+			SetDex(500, 650);
 			
-			SetDamage( 22, 29 );
+			SetDamage( 24, 33 );
 			
 			SetDamageType(ResistanceType.Physical, 50);
 			SetDamageType(ResistanceType.Energy, 50);
 			
-			SetSkill( SkillName.Wrestling, 150.0 );
-			SetSkill( SkillName.Anatomy, 10.0 );
-			SetSkill( SkillName.MagicResist,  110.0 );
-			SetSkill( SkillName.Magery, 120.0 );
-			SetSkill( SkillName.EvalInt, 150.0 );
-			SetSkill( SkillName.Meditation, 120.0 );
-            SetSkill(SkillName.Necromancy, 120.0);
-            SetSkill(SkillName.SpiritSpeak, 150.0);
+			SetSkill( SkillName.Wrestling, 120.0, 130.0 );
+			SetSkill( SkillName.Tactics, 115.0, 130.0 );
+			SetSkill( SkillName.MagicResist,  150.0, 200.0 );
+			SetSkill( SkillName.Magery, 135.0, 150.0 );
+			SetSkill( SkillName.EvalInt, 130.0, 150.0 );
+			SetSkill( SkillName.Meditation, 0.0 );
 			
-			SetResistance(ResistanceType.Physical, 60, 70);
-			SetResistance(ResistanceType.Fire, 60, 70);
-			SetResistance(ResistanceType.Cold, 20, 30);
-			SetResistance(ResistanceType.Poison, 60, 70);
-			SetResistance(ResistanceType.Energy, 60, 70);
+			SetResistance(ResistanceType.Physical, 60, 85);
+			SetResistance(ResistanceType.Fire, 70, 90);
+			SetResistance(ResistanceType.Cold, 40, 50);
+			SetResistance(ResistanceType.Poison, 90, 95);
+			SetResistance(ResistanceType.Energy, 50, 75);
 			
 			_NextNuke = DateTime.UtcNow + TimeSpan.FromMinutes(1);
 			_NextDismount = DateTime.UtcNow + TimeSpan.FromMinutes(1);
@@ -804,8 +837,9 @@ namespace Server.Engines.Shadowguard
 		private void DoDamage_Callback(object o)
 		{
             Mobile m = o as Mobile;
- 
-            if (m != null)
+            Map map = Map;
+
+            if (m != null && map != null)
             {
                 DoHarmful(m);
                 AOS.Damage(m, this, Utility.RandomMinMax(100, 150), 50, 50, 0, 0, 0);
@@ -825,15 +859,15 @@ namespace Server.Engines.Shadowguard
 
                     Movement.Movement.Offset(d, ref x, ref y);
 
-                    if (!this.Map.CanSpawnMobile(x, y, this.Map.GetAverageZ(x, y)))
+                    if (!map.CanSpawnMobile(x, y, map.GetAverageZ(x, y)))
                     {
-                        m.MoveToWorld(new Point3D(lastx, lasty, this.Map.GetAverageZ(lastx, lasty)), this.Map);
+                        m.MoveToWorld(new Point3D(lastx, lasty, map.GetAverageZ(lastx, lasty)), this.Map);
                         break;
                     }
 
                     if (range >= 12 && (orx != x || ory != y))
                     {
-                        m.MoveToWorld(new Point3D(x, y, this.Map.GetAverageZ(x, y)), this.Map);
+                        m.MoveToWorld(new Point3D(x, y, map.GetAverageZ(x, y)), this.Map);
                     }
                 }
 
@@ -887,21 +921,16 @@ namespace Server.Engines.Shadowguard
 	
 	public class Ozymandias : ShadowguardBoss
 	{
-	
 		public override Type[] SummonTypes { get { return _SummonTypes; } }
 		private Type[] _SummonTypes = new Type[] { typeof(LesserHiryu), typeof(EliteNinja), typeof(TsukiWolf) };
 		
 		public override double WeaponAbilityChance{ get{ return 0.4; } }
-		public override WeaponAbility GetWeaponAbility()
-		{
-			return WeaponAbility.Dismount;
-		}
 		
 		[Constructable]
-		public Ozymandias() : base(AIType.AI_Archer)
+		public Ozymandias() : base(AIType.AI_Melee)
 		{
-			Name = "ozymandias";
-			Title = "the lord of castle barataria";
+			Name = "Ozymandias";
+			Title = "the Lord of Castle Barataria";
 
             Hue = Race.RandomSkinHue();
             Body = 0x190;
@@ -932,8 +961,58 @@ namespace Server.Engines.Shadowguard
             SetWearable(new Waraji());
             SetWearable(new BoneArms());
 
+            var scimitar = new Scimitar();
+            scimitar.Movable = false;
+
+            PackItem(scimitar);
             PackItem(new Arrow(25));
+
+            var hiryu = new LesserHiryu();
+            hiryu.Rider = this;
+
+            SetWeaponAbility(WeaponAbility.Dismount);
 		}
+
+        private DateTime _NextWeaponSwitch;
+
+        public override void OnThink()
+        {
+            base.OnThink();
+
+            if (Combatant == null || this.Backpack == null || _NextWeaponSwitch > DateTime.UtcNow)
+                return;
+
+            BaseWeapon wep = Weapon as BaseWeapon;
+
+            if ((wep is Fists || wep is BaseRanged) && InRange(Combatant.Location, 1) && 0.1 > Utility.RandomDouble())
+            {
+                Item scimitar = this.Backpack.FindItemByType(typeof(Scimitar));
+
+                if (scimitar != null)
+                {
+                    if (wep is BaseRanged)
+                        this.Backpack.DropItem(wep);
+
+                    SetWearable(scimitar);
+
+                    _NextWeaponSwitch = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+                }
+            }
+            else if ((wep is Fists || !(wep is BaseRanged)) && !InRange(Combatant.Location, 1) && 0.1 > Utility.RandomDouble())
+            {
+                Item yumi = this.Backpack.FindItemByType(typeof(Yumi));
+
+                if (yumi != null)
+                {
+                    if (!(wep is Fists))
+                        this.Backpack.DropItem(wep);
+
+                    SetWearable(yumi);
+
+                    _NextWeaponSwitch = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+                }
+            }
+        }
 	
 		public Ozymandias(Serial serial) : base(serial)
 		{
